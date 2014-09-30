@@ -1,6 +1,21 @@
 var MEMOLISTNAME = "memo-list"; // localforage で利用するキー
 var ENDPOINT = "http://maps.googleapis.com/maps/api/geocode/json";
 
+var DRIVERLIST = [
+  window.localforage.INDEXEDDB,
+  window.localforage.WEBSQL,
+  window.localforage.LOCALSTORAGE
+];
+
+var ACTIVITIES = {
+  PICK: {
+    name : "pick",
+    data: {
+      type: "image/jpeg"
+    }
+  }
+};
+
 /*
  memo 作成画面で表示されるフォーム
 */
@@ -8,9 +23,15 @@ var memoInputElements = {
   title: document.querySelector("#memo-title"),
   place: document.querySelector("#memo-place"),
   details: document.querySelector("#memo-details"),
-  submit: document.querySelector("#memo-submit"),
-  location: document.querySelector("#memo-location")
+  picture: document.querySelector("#memo-picture"),
+  button: {
+    submit: document.querySelector("#memo-submit"),
+    location: document.querySelector("#memo-location"),
+    picture: document.querySelector("#memo-add-picture")
+  }
 };
+
+var _gc = null;
 
 /*
  様々な出力先
@@ -27,13 +48,24 @@ var memos = [];
 /*
  メモオブジェクトを作成する関数
  */
-var createMemo = function(title, place, details){
+var createMemo = function(title, place, details, picture){
   return {
     title: title,
     place: place,
     details: details,
+    picture: picture,
     timestamp: new Date()
   };
+};
+
+/*
+ メモの写真部分をHTMLにする関数
+*/
+var createMemoPictureElement = function(memo){
+  var img = document.createElement("img");
+  img.src = memo.picture;
+  img.classList.add("memo-picture");
+  return img;
 };
 
 /*
@@ -42,7 +74,7 @@ var createMemo = function(title, place, details){
 var createMemoTitleElement = function(memo){
   var div = document.createElement("div");
   div.textContent = memo.title;
-  div.setAttribute("class", "memo-title");
+  div.classList.add("memo-title");
   return div;
 };
 
@@ -67,11 +99,19 @@ var createMemoDetailsElement = function(memo){
 };
 
 /*
+ タイムスタンプの書式を整える関数
+*/
+var formatTimestamp = function(date){
+  return date.getFullYear() + "/" + (date.getMonth() + 1) + "/" + date.getDate() + " " +
+    date.getHours() + ":" + date.getMinutes();
+};
+
+/*
  メモオブジェクトの日付部分を HTML にする関数
  */
 var createMemoTimestampElement = function(memo){
   var div = document.createElement("div");
-  div.textContent = memo.timestamp;
+  div.textContent = formatTimestamp(memo.timestamp);
   div.setAttribute("class", "memo-timestamp");
   return div;
 };
@@ -80,7 +120,7 @@ var createMemoTimestampElement = function(memo){
  メモリストを保存する関数
  */
 var saveMemoList = function(){
-  localforage.setItem(MEMOLISTNAME, memos);
+  window.localforage.setItem(MEMOLISTNAME, memos);
 };
 
 /*
@@ -102,10 +142,14 @@ var removeMemo = function(memo, element){
  */
 var createMemoElement = function(memo){
   var li = document.createElement("li");
-  li.appendChild(createMemoTitleElement(memo));
-  li.appendChild(createMemoDetailsElement(memo));
-  li.appendChild(createMemoPlaceElement(memo));
-  li.appendChild(createMemoTimestampElement(memo));
+  li.appendChild(createMemoPictureElement(memo));
+  var div = document.createElement("div");
+  div.classList.add("memo-description");
+  div.appendChild(createMemoTitleElement(memo));
+  div.appendChild(createMemoDetailsElement(memo));
+  div.appendChild(createMemoPlaceElement(memo));
+  div.appendChild(createMemoTimestampElement(memo));
+  li.appendChild(div);
   li.setAttribute("class", "memo");
 
   // スワイプされたらメモを削除する
@@ -139,7 +183,8 @@ var clearMemoInput = function(){
 var addMemo = function(){
   var newMemo = createMemo(memoInputElements.title.value,
                            memoInputElements.place.value,
-                           memoInputElements.details.value);
+                           memoInputElements.details.value,
+                           memoInputElements.picture.toDataURL("image/jpeg"));
   memos.push(newMemo);
   displayMemo(newMemo);
   saveMemoList();
@@ -174,6 +219,48 @@ var estimateCurrentLocation = function(){
   navigator.geolocation.getCurrentPosition(invertGeocode, showGeolocationError);
 };
 
+var gc  = function(){
+  if(_gc == null){
+    _gc = memoInputElements.picture.getContext("2d");
+  }
+  return _gc;
+};
+
+var converter = function(){
+  return memoInputElements.picture;
+};
+
+var displayPicture = function(){
+  var canvas = converter();
+  var context = gc();
+  var img =  this;
+  var width, height, offsetX, offsetY;
+  if(img.width < img.height){
+    width = img.width;
+    height = img.width;
+    offsetX = 0;
+    offsetY = (img.height - height) / 2;
+  }else{
+    width = img.height;
+    height = img.height;
+    offsetX = (img.width - width) / 2;
+    offsetY = 0;
+  }
+  context.drawImage(img, offsetX, offsetY, width, height,
+                    0, 0, canvas.width, canvas.height);
+};
+
+var loadPicture = function(){
+  var img = new window.Image();
+  img.onload = displayPicture;
+  img.src = window.URL.createObjectURL(this.result.blob);
+};
+
+var addPicture = function(){
+  var pick = new window.MozActivity(ACTIVITIES.PICK);
+  pick.onsuccess = loadPicture;
+};
+
 /*
  保存されていたデータからメモリストと、画面表示を復元する関数。
  localforage.getItem のコールバック関数
@@ -194,9 +281,11 @@ var restoreMemoList = function(list){
  アプリの初期化を行う関数
  */
 var initApp = function(){
-  memoInputElements.submit.addEventListener("click", addMemo);
-  memoInputElements.location.addEventListener("click", estimateCurrentLocation);
-  localforage.getItem(MEMOLISTNAME, restoreMemoList);
+  memoInputElements.button.submit.addEventListener("click", addMemo);
+  memoInputElements.button.location.addEventListener("click", estimateCurrentLocation);
+  memoInputElements.button.picture.addEventListener("click", addPicture);
+  window.localforage.setDriver(DRIVERLIST);
+  window.localforage.getItem(MEMOLISTNAME, restoreMemoList);
 };
 
 initApp();

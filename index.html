@@ -21,11 +21,13 @@
         <div class="formGroupHead">メモの追加</div>
         <form>
           <div class="input-group">
+            <button type="button" class="button icon add" id="memo-submit">追加</button>
+            <button type="button" class="button icon pin" id="memo-location">位置</button>
+            <button type="button" class="button icon picture" id="memo-add-picture">写真</button>
             <input placeholder="内容" type="text" id="memo-title">
             <input placeholder="場所" type="text" id="memo-place">
             <textarea rows="6" placeholder="詳細" id="memo-details"></textarea>
-            <button type="button" class="button icon add" id="memo-submit">追加</button>
-            <button type="button" class="button icon pin" id="memo-location">現在地を取得</button>
+            <canvas id="memo-picture" width="320" height="320"></canvas>
           </div>
         </form>
       </div>
@@ -35,7 +37,6 @@
       </div>
     </div>
     <script src="js/appframework.ui.min.js"></script>    
-    <script src="js/af.plugins.min.js"></script>
     <script src="js/localforage.min.js"></script>
     <script src="js/app.js"></script>
   </body>
