@@ -153,7 +153,10 @@ var createMemoElement = function(memo){
   li.setAttribute("class", "memo");
 
   // スワイプされたらメモを削除する
-  li.addEventListener("swipe", function(){
+  li.addEventListener("swipeLeft", function(){
+    removeMemo(memo, li);
+  });
+  li.addEventListener("swipeRight", function(){
     removeMemo(memo, li);
   });
   
@@ -175,6 +178,12 @@ var clearMemoInput = function(){
   memoInputElements.title.value = "";
   memoInputElements.place.value = "";
   memoInputElements.details.value = "";
+  
+  var context = gc();
+  context.fillStyle = "white";
+  context.fillRect(0, 0,
+                   memoInputElements.picture.width,
+                   memoInputElements.picture.height);
 };
 
 /*
